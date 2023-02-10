@@ -115,12 +115,12 @@ class MongodbExporterCharm(CharmBase):
 
     def _validate_configured_db(self) -> None:
         """
-        Validate charm is using at least one databse
+        Validates charm is using at least one databse
 
         Raises:
             CharmError: if charm configuration is invalid.
         """
-        logger.warning("Validating configured DB")
+        logger.debug("Validating configured DB")
 
         if (
             not self.config.get("mongodb-uri")
@@ -144,7 +144,7 @@ class MongodbExporterCharm(CharmBase):
         Raises:
             CharmError: if charm configuration is invalid.
         """
-        logger.warning("Validating duplicated DB")
+        logger.debug("Validating duplicated DB")
 
         if not self.config.get("mongodb-uri"):
             return
@@ -160,7 +160,7 @@ class MongodbExporterCharm(CharmBase):
         Raises:
             CharmError: if charm configuration is invalid.
         """
-        logger.warning("Validating config")
+        logger.debug("Validating config")
         if self.config["log-level"].upper() not in [
             "TRACE",
             "DEBUG",
@@ -197,7 +197,7 @@ class MongodbExporterCharm(CharmBase):
     def _on_update_status(self, _=None) -> None:
         """Handler for the update-status event."""
         try:
-            logger.warning("Validating update_status")
+            logger.debug("Validating update_status")
             self._validate_config()
             self._check_relations()
             check_container_ready(self.container)
@@ -220,7 +220,7 @@ class MongodbExporterCharm(CharmBase):
         Raises:
             CharmError: if charm configuration is invalid.
         """
-        logger.warning("check for missing relations")
+        logger.debug("check for missing relations")
         try:
             self._validate_duplicated_db()
             self._validate_configured_db()
@@ -229,10 +229,6 @@ class MongodbExporterCharm(CharmBase):
 
     def _on_database_created(self, event: DatabaseCreatedEvent) -> None:
         """Event triggered when a database was created for this application via relation."""
-        logger.critical(f"Database credentials are received: {event.username}")
-        logger.critical(
-            f"Database uri: {self.mongodb_client.fetch_relation_data().values()}"
-        )
         self.mongodb_uri = list(self.mongodb_client.fetch_relation_data().values())[0][
             "uris"
         ]

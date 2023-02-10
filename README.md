@@ -8,12 +8,11 @@ Avoid using this README file for information that is maintained or published els
 Use links instead.
 -->
 
-# mongodb-exporter
+# osm-mongodb-exporter
 
-Charmhub package name: operator-template
-More information: https://charmhub.io/mongodb-exporter
+More information: https://charmhub.io/osm-mongodb-exporter
 
-Describe your charm in one or two sentences.
+Prometheus Mongodb Exporter for OSM Charms
 
 ## Other resources
 

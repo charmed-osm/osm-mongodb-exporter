@@ -14,23 +14,21 @@ https://discourse.charmhub.io/t/4208
 
 import logging
 
-from ops.charm import CharmBase, RelationBrokenEvent
-from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
-
 from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseCreatedEvent,
     DatabaseRequires,
 )
-from charms.nginx_ingress_integrator.v0.ingress import IngressRequires
-from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+from charms.nginx_ingress_integrator.v0.ingress import IngressRequires
 from charms.osm_libs.v0.utils import (
     CharmError,
     check_container_ready,
     check_service_active,
 )
-import re
+from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
+from ops.charm import CharmBase, RelationBrokenEvent
+from ops.main import main
+from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -76,12 +74,8 @@ class MongodbExporterCharm(CharmBase):
         )
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.update_status, self._on_update_status)
-        self.framework.observe(
-            self.mongodb_client.on.database_created, self._on_database_created
-        )
-        self.framework.observe(
-            self.on["mongodb"].relation_broken, self._on_db_relation_broken
-        )
+        self.framework.observe(self.mongodb_client.on.database_created, self._on_database_created)
+        self.framework.observe(self.on["mongodb"].relation_broken, self._on_db_relation_broken)
 
     def _on_mongodb_exporter_pebble_ready(self, event):
         """Define and start a workload using the Pebble API.
@@ -100,12 +94,9 @@ class MongodbExporterCharm(CharmBase):
         self.unit.status = ActiveStatus()
 
     def _configure_service(self, event) -> None:
-
         if self.container.can_connect():
             # Push an updated layer with the new config
-            self.container.add_layer(
-                "mongodb-exporter", self._pebble_layer, combine=True
-            )
+            self.container.add_layer("mongodb-exporter", self._pebble_layer, combine=True)
             self.container.replan()
             self.unit.status = ActiveStatus()
         else:
@@ -114,22 +105,18 @@ class MongodbExporterCharm(CharmBase):
             self.unit.status = WaitingStatus("waiting for Pebble API")
 
     def _validate_configured_db(self) -> None:
-        """
-        Validates charm is using at least one databse
+        """Validate that the charm uses at least one database.
 
         Raises:
             CharmError: if charm configuration is invalid.
         """
         logger.debug("Validating configured DB")
 
-        if (
-            not self.config.get("mongodb-uri")
-            and not self._check_mongodb_relation_created()
-        ):
+        if not self.config.get("mongodb-uri") and not self._check_mongodb_relation_created():
             raise CharmError("Mongodb need to be added via relation or via config")
 
     def _check_mongodb_relation_created(self) -> bool:
-        """Returns True if the database exists"""
+        """Return True if the database exists."""
         try:
             return not self.mongodb_client.is_resource_created()
         except RuntimeError as error:
@@ -137,9 +124,7 @@ class MongodbExporterCharm(CharmBase):
             return False
 
     def _validate_duplicated_db(self) -> None:
-        """
-        Validate charm doesn't has configuration and relation for
-        the database at the same time
+        """Validate charm doesn't has configuration and relation for the database at the same time.
 
         Raises:
             CharmError: if charm configuration is invalid.
@@ -150,9 +135,7 @@ class MongodbExporterCharm(CharmBase):
             return
         if not self._check_mongodb_relation_created():
             return
-        raise CharmError(
-            "Mongodb cannot added via relation and via config at the same time"
-        )
+        raise CharmError("Mongodb cannot added via relation and via config at the same time")
 
     def _validate_config(self) -> None:
         """Validate charm configuration.
@@ -195,7 +178,7 @@ class MongodbExporterCharm(CharmBase):
             self.unit.status = error.status
 
     def _on_update_status(self, _=None) -> None:
-        """Handler for the update-status event."""
+        """Handle the update-status event."""
         try:
             logger.debug("Validating update_status")
             self._validate_config()
@@ -229,9 +212,7 @@ class MongodbExporterCharm(CharmBase):
 
     def _on_database_created(self, event: DatabaseCreatedEvent) -> None:
         """Event triggered when a database was created for this application via relation."""
-        self.mongodb_uri = list(self.mongodb_client.fetch_relation_data().values())[0][
-            "uris"
-        ]
+        self.mongodb_uri = list(self.mongodb_client.fetch_relation_data().values())[0]["uris"]
         self._on_config_changed(event)
 
     def _update_ingress_config(self) -> None:
@@ -245,7 +226,6 @@ class MongodbExporterCharm(CharmBase):
     @property
     def _pebble_layer(self):
         """Return a dictionary representing a Pebble layer."""
-
         environments = {"MONGODB_URI": self.mongodb_uri}
 
         return {

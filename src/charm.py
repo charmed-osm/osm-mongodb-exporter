@@ -113,16 +113,6 @@ class MongodbExporterCharm(CharmBase):
             event.defer()
             self.unit.status = WaitingStatus("waiting for Pebble API")
 
-    def _fetch_mongo_relation_data(self) -> dict:
-        """Get database relation data"""
-        try:
-            data = self.mongodb_client.fetch_relation_data()
-            logger.warning("Got following database data: %s", data)
-            return data
-        except RuntimeError as error:
-            logger.warning("Couldn't get the data from the relation: %s", error)
-            return {}
-
     def _validate_configured_db(self) -> None:
         """
         Validate charm is using at least one databse
@@ -131,7 +121,6 @@ class MongodbExporterCharm(CharmBase):
             CharmError: if charm configuration is invalid.
         """
         logger.warning("Validating configured DB")
-        logger.warning(self.mongodb_client.is_resource_created())
         if (
             not self.config.get("mongodb-uri")
             and self.mongodb_client.is_resource_created()

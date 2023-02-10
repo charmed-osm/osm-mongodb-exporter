@@ -1,0 +1,28 @@
+# This file populates the Overview on Charmhub.
+# See https://juju.is/docs/sdk/metadata-reference for a checklist and guidance.
+
+# The charm package name, no spaces (required)
+# See https://juju.is/docs/sdk/naming#heading--naming-charms for guidance.
+name: osm-mongodb-exporter
+display-name: OSM Prometheus Mongodb Exporter K8s
+summary: OSM Prometheus Mongodb Exporter
+description: |
+  Charm to deploy OSM's Prometheus Mongodb Exporter.
+containers:
+  mongodb-exporter:
+    resource: image
+resources:
+  image:
+    type: oci-image
+    description: Image of mongodb-exporter
+    upstream-source: "bitnami/mongodb-exporter:0.30.0"
+provides:
+  metrics-endpoint:
+    interface: prometheus_scrape
+  grafana-dashboard:
+    interface: grafana_dashboard
+requires:
+  mongodb:
+    interface: mongodb_client
+  ingress:
+    interface: ingress

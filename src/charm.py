@@ -121,11 +121,20 @@ class MongodbExporterCharm(CharmBase):
             CharmError: if charm configuration is invalid.
         """
         logger.warning("Validating configured DB")
+
         if (
             not self.config.get("mongodb-uri")
-            and self.mongodb_client.is_resource_created()
+            and not self._check_mongodb_relation_created()
         ):
             raise CharmError("Mongodb need to be added via relation or via config")
+
+    def _check_mongodb_relation_created(self) -> bool:
+        """Returns True if the database exists"""
+        try:
+            return not self.mongodb_client.is_resource_created()
+        except RuntimeError as error:
+            logger.warning("Was not possible to check the relation: %s", error)
+            return False
 
     def _validate_duplicated_db(self) -> None:
         """
@@ -136,10 +145,10 @@ class MongodbExporterCharm(CharmBase):
             CharmError: if charm configuration is invalid.
         """
         logger.warning("Validating duplicated DB")
-        logger.warning(self.mongodb_client.is_resource_created())
+
         if not self.config.get("mongodb-uri"):
             return
-        if self.mongodb_client.is_resource_created():
+        if not self._check_mongodb_relation_created():
             return
         raise CharmError(
             "Mongodb cannot added via relation and via config at the same time"

@@ -33,13 +33,13 @@ class TestCharm(unittest.TestCase):
                 "mongodb-exporter": {
                     "override": "replace",
                     "summary": "mongodb-exporter service",
-                    "command": "/bin/mongodb_exporter --mongodb.uri=None",
+                    "command": "/bin/mongodb_exporter --mongodb.uri=mongodb://mongodb:27017/",
                     "startup": "enabled",
-                    "environment": {"MONGODB_URI": None},
+                    "environment": {"MONGODB_URI": "mongodb://mongodb:27017/"},
                 },
             },
         }
-
+        self.harness.update_config({"mongodb-uri": "mongodb://mongodb:27017/"})
         self.harness.container_pebble_ready("mongodb-exporter")
         updated_plan = self.harness.get_container_pebble_plan("mongodb-exporter").to_dict()
         self.assertEqual(expected_plan, updated_plan)
@@ -48,6 +48,18 @@ class TestCharm(unittest.TestCase):
         )
         self.assertTrue(service.is_running())
         self.assertEqual(self.harness.model.unit.status, ActiveStatus())
+
+    def test_mongodb_exporter_pebble_not_ready(self):
+        """Test to check the plan created is the expected one."""
+        # Expected plan after Pebble ready with default config
+        expected_plan = {}
+        error_message = (
+            "No Mongodb uri added. Mongodb uri needs to be added via relation or via config"
+        )
+        self.harness.container_pebble_ready("mongodb-exporter")
+        updated_plan = self.harness.get_container_pebble_plan("mongodb-exporter").to_dict()
+        self.assertEqual(expected_plan, updated_plan)
+        self.assertEqual(self.harness.model.unit.status, BlockedStatus(error_message))
 
     def test_config_changed_valid_can_connect(self):
         """Valid config change for mongodb-uri parameter."""
@@ -79,11 +91,12 @@ class TestCharm(unittest.TestCase):
 
     def test_config_log_changed_no_mongodb(self):
         """Valid config change for log-level parameter."""
-        error_message = "Mongodb need to be added via relation or via config"
+        error_message = (
+            "No Mongodb uri added. Mongodb uri needs to be added via relation or via config"
+        )
         self.harness.set_can_connect("mongodb-exporter", True)
         self.harness.update_config({"log-level": "INFO"})
-        self.assertIsInstance(self.harness.model.unit.status, BlockedStatus)
-        self.assertIn(self.harness.charm.unit.status.message, error_message)
+        self.assertEqual(self.harness.model.unit.status, BlockedStatus(error_message))
 
     def test_no_config(self):
         """No database related or configured in the charm."""
@@ -157,6 +170,15 @@ class TestCharm(unittest.TestCase):
         self.harness.charm._on_database_created(DatabaseCreatedEvent)
         self.assertIsInstance(self.harness.model.unit.status, ActiveStatus)
 
+    def test_db_creation_failed(self):
+        """DB creation failedtest."""
+        error_message = (
+            "No Mongodb uri added. Mongodb uri needs to be added via relation or via config"
+        )
+        self.harness.set_can_connect("mongodb-exporter", True)
+        self.harness.charm._on_database_created(DatabaseCreatedEvent)
+        self.assertEqual(self.harness.model.unit.status, BlockedStatus(error_message))
+
     def test_db_duplicated(self):
         """Connected to Mongo through config and relation."""
         error_message = "Mongodb cannot added via relation and via config at the same time"
@@ -173,5 +195,24 @@ class TestCharm(unittest.TestCase):
             },
         )
         self.harness.update_config({"mongodb-uri": "mongodb://mongodb:27017/"})
-        self.assertIsInstance(self.harness.model.unit.status, BlockedStatus)
-        self.assertIn(self.harness.charm.unit.status.message, error_message)
+        self.assertEqual(self.harness.model.unit.status, BlockedStatus(error_message))
+
+    def test_db_duplicated_and_relation_broken(self):
+        """Connected to Mongo through config and relation and then remove the relation."""
+        error_message = "Mongodb cannot added via relation and via config at the same time"
+        self.harness.set_can_connect("mongodb-exporter", True)
+        relation_id = self.harness.add_relation("mongodb", "mongodb")
+        self.harness.add_relation_unit(relation_id, "mongodb/0")
+        self.harness.update_relation_data(
+            relation_id,
+            "mongodb",
+            {
+                "uris": "mongodb://relation-3:27017",
+                "username": "mongo",
+                "password": "mongo",
+            },
+        )
+        self.harness.update_config({"mongodb-uri": "mongodb://mongodb:27017/"})
+        self.assertEqual(self.harness.model.unit.status, BlockedStatus(error_message))
+        self.harness.remove_relation(relation_id)
+        self.assertIsInstance(self.harness.model.unit.status, ActiveStatus)

@@ -38,7 +38,10 @@ async def test_build_and_deploy(ops_test: OpsTest):
         ),
         ops_test.model.deploy(INGRESS_CHARM, application_name=INGRESS_APP, channel="stable"),
         ops_test.model.deploy(
-            MONGO_DB_CHARM, application_name=MONGO_DB_APP, channel="edge", series="jammy"
+            MONGO_DB_CHARM,
+            application_name=MONGO_DB_APP,
+            channel="edge",
+            series="jammy",
         ),
     )
 
@@ -49,7 +52,10 @@ async def test_build_and_deploy(ops_test: OpsTest):
         )
     assert ops_test.model.applications[APP_NAME].status == "blocked"
     unit = ops_test.model.applications[APP_NAME].units[0]
-    assert unit.workload_status_message == "Mongodb need to be added via relation or via config"
+    assert (
+        unit.workload_status_message
+        == "No Mongodb uri added. Mongodb uri needs to be added via relation or via config"
+    )
 
     logger.info("Adding relations")
     await ops_test.model.applications[APP_NAME].set_config(APP_CONFIG)
@@ -72,5 +78,6 @@ async def test_mongodb_exporter_blocks_without_mongodb(ops_test: OpsTest):
     assert ops_test.model.applications[APP_NAME].status == "blocked"
     for unit in ops_test.model.applications[APP_NAME].units:
         assert (
-            unit.workload_status_message == "Mongodb need to be added via relation or via config"
+            unit.workload_status_message
+            == "No Mongodb uri added. Mongodb uri needs to be added via relation or via config"
         )

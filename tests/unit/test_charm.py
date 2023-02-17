@@ -97,7 +97,13 @@ class TestCharm(unittest.TestCase):
         relation_id = self.harness.add_relation("mongodb", "mongodb")
         self.harness.add_relation_unit(relation_id, "mongodb/0")
         self.harness.update_relation_data(
-            relation_id, "mongodb", {"uris": "mongodb://relation-3:27017"}
+            relation_id,
+            "mongodb",
+            {
+                "uris": "mongodb://relation-3:27017",
+                "username": "mongo",
+                "password": "mongo",
+            },
         )
         self.harness.charm.on.config_changed.emit()
         self.assertIsInstance(self.harness.model.unit.status, ActiveStatus)
@@ -108,7 +114,13 @@ class TestCharm(unittest.TestCase):
         relation_id = self.harness.add_relation("mongodb", "mongodb")
         self.harness.add_relation_unit(relation_id, "mongodb/0")
         self.harness.update_relation_data(
-            relation_id, "mongodb", {"uris": "mongodb://relation-3:27017"}
+            relation_id,
+            "mongodb",
+            {
+                "uris": "mongodb://relation-3:27017",
+                "username": "mongo",
+                "password": "mongo",
+            },
         )
         self.harness.charm.on.config_changed.emit()
         self.assertIsInstance(self.harness.model.unit.status, ActiveStatus)
@@ -134,7 +146,13 @@ class TestCharm(unittest.TestCase):
         relation_id = self.harness.add_relation("mongodb", "mongodb")
         self.harness.add_relation_unit(relation_id, "mongodb/0")
         self.harness.update_relation_data(
-            relation_id, "mongodb", {"uris": "mongodb://relation-3:27017"}
+            relation_id,
+            "mongodb",
+            {
+                "uris": "mongodb://relation-3:27017",
+                "username": "mongo",
+                "password": "mongo",
+            },
         )
         self.harness.charm._on_database_created(DatabaseCreatedEvent)
         self.assertIsInstance(self.harness.model.unit.status, ActiveStatus)
@@ -146,7 +164,13 @@ class TestCharm(unittest.TestCase):
         relation_id = self.harness.add_relation("mongodb", "mongodb")
         self.harness.add_relation_unit(relation_id, "mongodb/0")
         self.harness.update_relation_data(
-            relation_id, "mongodb", {"uris": "mongodb://relation-3:27017"}
+            relation_id,
+            "mongodb",
+            {
+                "uris": "mongodb://relation-3:27017",
+                "username": "mongo",
+                "password": "mongo",
+            },
         )
         self.harness.update_config({"mongodb-uri": "mongodb://mongodb:27017/"})
         self.assertIsInstance(self.harness.model.unit.status, BlockedStatus)

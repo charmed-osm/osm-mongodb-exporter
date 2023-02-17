@@ -118,7 +118,7 @@ class MongodbExporterCharm(CharmBase):
     def _check_mongodb_relation_created(self) -> bool:
         """Return True if the database exists."""
         try:
-            return not self.mongodb_client.is_resource_created()
+            return self.mongodb_client.is_resource_created()
         except RuntimeError as error:
             logger.warning("Was not possible to check the relation: %s", error)
             return False

@@ -65,7 +65,10 @@ class MongodbExporterCharm(CharmBase):
             self, relation_name="grafana-dashboard"
         )
         self.mongodb_client = DatabaseRequires(
-            self, relation_name="mongodb", database_name=self.app.name
+            self,
+            relation_name="mongodb",
+            database_name=self.app.name,
+            extra_user_roles="admin",
         )
 
         self.framework.observe(
@@ -85,13 +88,22 @@ class MongodbExporterCharm(CharmBase):
 
         Learn more about interacting with Pebble at at https://juju.is/docs/sdk/pebble.
         """
-        # Add initial Pebble config layer using the Pebble API
-        self.container.add_layer("mongodb-exporter", self._pebble_layer, combine=True)
-        # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
-        self.container.replan()
-        # Learn more about statuses in the SDK docs:
-        # https://juju.is/docs/sdk/constructs#heading--statuses
-        self.unit.status = ActiveStatus()
+        try:
+            self.mongodb_uri = self._get_mongodb_uri(event)
+            # Add initial Pebble config layer using the Pebble API
+            self.container.add_layer(
+                "mongodb-exporter",
+                self._pebble_layer,
+                combine=True,
+            )
+            # Make Pebble reevaluate its plan, ensuring any services are started if enabled.
+            self.container.replan()
+            # Learn more about statuses in the SDK docs:
+            # https://juju.is/docs/sdk/constructs#heading--statuses
+            self.unit.status = ActiveStatus()
+        except CharmError as error:
+            logger.warning(error.message)
+            self.unit.status = error.status
 
     def _configure_service(self, event) -> None:
         if self.container.can_connect():
@@ -104,38 +116,39 @@ class MongodbExporterCharm(CharmBase):
             event.defer()
             self.unit.status = WaitingStatus("waiting for Pebble API")
 
-    def _validate_configured_db(self) -> None:
-        """Validate that the charm uses at least one database.
+    def _get_mongodb_relation(self, event):
+        if type(event).__name__ == "RelationBrokenEvent":
+            return None
+        if self.mongodb_client.is_resource_created():
+            return list(self.mongodb_client.fetch_relation_data().values())[0]["uris"]
+        return None
 
-        Raises:
-            CharmError: if charm configuration is invalid.
-        """
-        logger.debug("Validating configured DB")
-
-        if not self.config.get("mongodb-uri") and not self._check_mongodb_relation_created():
-            raise CharmError("Mongodb need to be added via relation or via config")
-
-    def _check_mongodb_relation_created(self) -> bool:
-        """Return True if the database exists."""
+    def _get_mongodb_config(self):
         try:
-            return not self.mongodb_client.is_resource_created()
-        except RuntimeError as error:
-            logger.warning("Was not possible to check the relation: %s", error)
-            return False
+            self._validate_config()
+            return self.model.config.get("mongodb-uri")
+        except CharmError as error:
+            raise CharmError(error.message) from error
 
-    def _validate_duplicated_db(self) -> None:
-        """Validate charm doesn't has configuration and relation for the database at the same time.
+    def _get_mongodb_uri(self, event=None) -> str:
+        """Return Mongodb uri.
 
         Raises:
-            CharmError: if charm configuration is invalid.
+            CharmError: if no Mongodb uri.
         """
-        logger.debug("Validating duplicated DB")
+        relation = self._get_mongodb_relation(event)
 
-        if not self.config.get("mongodb-uri"):
-            return
-        if not self._check_mongodb_relation_created():
-            return
-        raise CharmError("Mongodb cannot added via relation and via config at the same time")
+        if configuration := self._get_mongodb_config():
+            if relation:
+                raise CharmError(
+                    "Mongodb cannot added via relation and via config at the same time"
+                )
+            return configuration
+        if not relation:
+            raise CharmError(
+                "No Mongodb uri added. Mongodb uri needs to be added via relation or via config"
+            )
+        return relation
 
     def _validate_config(self) -> None:
         """Validate charm configuration.
@@ -163,26 +176,23 @@ class MongodbExporterCharm(CharmBase):
                     f"invalid mongodb uri: {self.model.config['mongodb-uri']}"
                 )
                 raise CharmError("mongodb-uri is not properly formed")
-            self.mongodb_uri = self.model.config["mongodb-uri"]
 
     def _on_config_changed(self, event) -> None:
         """Handle changed configuration."""
         try:
             # Fetch the new config value
-            self._validate_config()
-            self._check_relations()
+            self.mongodb_uri = self._get_mongodb_uri(event)
             self._configure_service(event)
             self._update_ingress_config()
         except CharmError as error:
             logger.warning(error.message)
             self.unit.status = error.status
 
-    def _on_update_status(self, _=None) -> None:
+    def _on_update_status(self, event=None) -> None:
         """Handle the update-status event."""
         try:
             logger.debug("Validating update_status")
-            self._validate_config()
-            self._check_relations()
+            self.mongodb_uri = self._get_mongodb_uri(event)
             check_container_ready(self.container)
             check_service_active(self.container, self.pebble_service_name)
             self.unit.status = ActiveStatus()
@@ -193,27 +203,18 @@ class MongodbExporterCharm(CharmBase):
     def _on_db_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Handle relation broken event."""
         try:
-            self._validate_configured_db()
+            self.mongodb_uri = self._get_mongodb_uri(event)
+            self._configure_service(event)
         except CharmError as error:
             self.unit.status = error.status
 
-    def _check_relations(self) -> None:
-        """Validate charm relations.
-
-        Raises:
-            CharmError: if charm configuration is invalid.
-        """
-        logger.debug("check for missing relations")
-        try:
-            self._validate_duplicated_db()
-            self._validate_configured_db()
-        except CharmError as error:
-            raise CharmError(error.message) from error
-
     def _on_database_created(self, event: DatabaseCreatedEvent) -> None:
         """Event triggered when a database was created for this application via relation."""
-        self.mongodb_uri = list(self.mongodb_client.fetch_relation_data().values())[0]["uris"]
-        self._on_config_changed(event)
+        try:
+            self.mongodb_uri = self._get_mongodb_uri(event)
+            self._on_config_changed(event)
+        except CharmError as error:
+            self.unit.status = error.status
 
     def _update_ingress_config(self) -> None:
         """Update ingress config in relation."""

@@ -40,7 +40,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
         ops_test.model.deploy(
             MONGO_DB_CHARM,
             application_name=MONGO_DB_APP,
-            channel="edge",
+            channel="5/edge",
             series="jammy",
         ),
     )
